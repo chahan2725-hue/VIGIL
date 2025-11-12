@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>VIGIL サンプル</title>
+  <style>
+    body { background-color: #ffffff; font-family: "Segoe UI", sans-serif; margin:0; padding:0; }
+    .header { position: fixed; top:0; left:0; width:100%; height:60px; background-color:#15fd00; color:white; display:flex; align-items:center; padding-left:20px; font-size:24px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.2); z-index:1000; }
+    .content { padding-top:80px; text-align:center; }
+    .button-container { display:flex; flex-wrap: wrap; justify-content:center; gap:40px; margin-top:50px; }
+    .btn-block { display:flex; flex-direction:column; align-items:center; }
+    .btn { background-color:#0078d7; color:white; border:none; padding: 150px 10px; border-radius:10px; font-size:22px; cursor:pointer; transition:background 0.3s, transform 0.2s; box-shadow:0 4px 10px rgba(0,0,0,0.15); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; text-decoration:none; }
+    .btn:hover { background-color:#005fa3; transform:translateY(-4px); }
+    .btn:active { transform:translateY(0); }
+    .btn-title { font-size:24px; font-weight:bold; margin-bottom:8px; }
+    .btn-desc { font-size:14px; color:#eef3f9; line-height:1.3; }
+  </style>
+</head>
+<body>
+
+  <div class="header">VIGIL</div>
+
+  <div class="content">
+    <h1>防災情報サイトサンプル</h1>
+
+    <div class="button-container">
+
+      <div class="btn-block">
+        <a href="earthquake.html" class="btn">
+          <div class="btn-title">地震情報</div>
+          <div class="btn-desc">発生した地震の情報や、各地の震度をご覧いただけます。</div>
+        </a>
+      </div>
+
+      <div class="btn-block">
+        <a href="eew.html" class="btn">
+          <div class="btn-title">緊急地震速報（EEW）</div>
+          <div class="btn-desc">発表された緊急地震速報をご覧いただけます。</div>
+        </a>
+      </div>
+
+      <div class="btn-block">
+        <a href="usgs.html" class="btn">
+          <div class="btn-title">USGS</div>
+          <div class="btn-desc">世界の地震情報（USGS）をご覧いただけます。</div>
+        </a>
+      </div>
+
+      <!-- 新しいボタン追加 -->
+      <div class="btn-block">
+        <a href="warning.html" class="btn">
+          <div class="btn-title">気象警報</div>
+          <div class="btn-desc">現在発表されている気象警報をご覧いただけます。</div>
+        </a>
+      </div>
+
+      <div class="btn-block">
+        <a href="advisory.html" class="btn">
+          <div class="btn-title">気象注意報</div>
+          <div class="btn-desc">現在発表されている気象注意報をご覧いただけます。</div>
+        </a>
+      </div>
+
+      <div class="btn-block">
+        <a href="landslide.html" class="btn">
+          <div class="btn-title">土砂災害警戒情報</div>
+          <div class="btn-desc">土砂災害の警戒情報をご覧いただけます。</div>
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>
