@@ -4,13 +4,82 @@
 <meta charset="UTF-8">
 <title>地震情報 - VIGIL</title>
 <style>
-  body { background-color: #ffffff; font-family: "Segoe UI", sans-serif; margin:0; padding:0; }
-  .header { position: fixed; top:0; left:0; width:100%; height:60px; background-color:#107e07; color:white; display:flex; align-items:center; padding:0 20px; font-size:22px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.2); z-index:1000; justify-content: space-between;}
-  .back-btn { color:white; text-decoration:none; font-size:18px; padding:6px 12px; border:1px solid white; border-radius:6px;}
-  .back-btn:hover { background-color: rgba(255,255,255,0.2);}
-  .content { padding-top:90px; text-align:center; }
-  .subtitle { font-size:26px; font-weight:bold; margin-bottom:20px; }
-  .data-box { margin:0 auto; width:90%; max-width:700px; background:#f0f0f0; border-radius:10px; padding:20px; box-shadow:0 2px 5px rgba(0,0,0,0.1); min-height:200px; text-align:left; white-space:pre-wrap; }
+  body {
+    background-color: #ffffff;
+    font-family: "Segoe UI", sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+
+  .header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 60px;
+    background-color: #107e07;
+    color: white;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    font-size: 22px;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+    justify-content: space-between;
+  }
+
+  .back-btn {
+    color: white;
+    text-decoration: none;
+    font-size: 18px;
+    padding: 6px 12px;
+    border: 1px solid white;
+    border-radius: 6px;
+  }
+  .back-btn:hover {
+    background-color: rgba(255,255,255,0.2);
+  }
+
+  .content {
+    padding-top: 90px;
+    text-align: center;
+  }
+
+  .subtitle {
+    font-size: 26px;
+    font-weight: bold;
+    margin-bottom: 20px;
+  }
+
+  .data-box {
+    margin: 20px auto;
+    width: 90%;
+    max-width: 700px;
+    background: #f0f0f0;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    white-space: pre-wrap;
+    text-align: left;
+    position: relative;
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #107e07;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .copy-btn:hover {
+    background: #0e6b06;
+  }
 </style>
 </head>
 <body>
@@ -22,58 +91,187 @@
 
 <div class="content">
   <div class="subtitle">地震情報</div>
-  <div class="data-box" id="earthquake-data">取得中...</div>
+  <div id="earthquake-container">
+    読み込み中…
+  </div>
 </div>
 
 <script>
-async function fetchEarthquakes() {
-  const url = "https://api.p2pquake.net/v2/history?codes=551&limit=5";
-  const container = document.getElementById("earthquake-data");
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`APIエラー: ${response.status}`);
-    const data = await response.json();
-    if (!data || data.length === 0) { container.textContent = "地震情報はありません"; return; }
+// ---------------------
+// 補助関数群
+// ---------------------
+function depthToText(depth) {
+  if (depth == null || depth < 0) return "不明";
+  if (depth === 0) return "ごく浅い";
+  return depth + "km";
+}
 
-    const formatted = data.map(item => {
-      const eq = item.earthquake;
-      const h = eq.hypocenter || {};
-      const place = h.name || "(発生地点不明)";
-      const maxScale = scaleToText(eq.maxScale);
-      const magnitude = h.magnitude != null ? h.magnitude.toFixed(1) : "不明";
-      const depth = depthToText(h.depth);
-      const tsunamiText = buildTsunamiText(eq.domesticTsunami, eq.foreignTsunami);
-      const intensityInfo = item.points && item.points.length>0 ? buildAreaText(item.points) : "◁震度情報不明▷";
-      const time = new Date(eq.time).toLocaleString('ja-JP');
-      return `《${item.issue?.type || "地震情報"}》
+function scaleToText(scale) {
+  if (scale == null || scale < 0) return "不明";
+  const map = {10:'1',20:'2',30:'3',40:'4',45:'5-',50:'5+',55:'6-',60:'6+',70:'7'};
+  return map[scale] || '不明';
+}
+
+function buildTsunamiText(domestic, foreign) {
+  const d = domestic || "Unknown";
+  const f = foreign || "";
+  if (d==="Warning" || d==="Watch") return "津波に関する情報を発表しています。";
+  if (d==="NonEffective") return "津波予報(若干の海面変動)を発表していますが、被害の心配はありません。";
+  if (d==="None") {
+    if (f==="Warning" || f==="Watch") return "この地震による国内での津波の心配はありません。";
+    return "この地震による津波の心配はありません。";
+  }
+  if (d==="Checking") return "この地震による津波の有無を現在調査中です。";
+  if (d==="Unknown") return "この地震による津波の有無は不明です。";
+  return "#Tsunami:Error!";
+}
+
+function compareScale(a, b) {
+  const order = {'1':10,'2':20,'3':30,'4':40,'5-':45,'5+':50,'6-':55,'6+':60,'7':70};
+  return (order[a]||0) - (order[b]||0);
+}
+
+function buildAreaText(points) {
+  if (!points || points.length === 0) return "◁震度情報不明▷";
+
+  const cityMaxScale = {};
+  points.forEach(p => {
+    const scale = scaleToText(p.scale);
+    const cityMatch = p.addr.match(/(.+?[市区町村])/);
+    const city = cityMatch ? cityMatch[1] : p.addr;
+    const key = `${p.pref}:${city}`;
+    if (!cityMaxScale[key] || compareScale(scale, cityMaxScale[key]) > 0) {
+      cityMaxScale[key] = scale;
+    }
+  });
+
+  const grouped = {};
+  Object.keys(cityMaxScale).forEach(k => {
+    const [pref, city] = k.split(':');
+    const scale = cityMaxScale[k];
+    if (!grouped[scale]) grouped[scale] = {};
+    if (!grouped[scale][pref]) grouped[scale][pref] = [];
+    grouped[scale][pref].push(city);
+  });
+
+  const prefOrder = [
+    "北海道","青森県","秋田県","岩手県","宮城県","山形県","福島県",
+    "茨城県","栃木県","群馬県","埼玉県","東京都","千葉県","神奈川県",
+    "山梨県","静岡県","愛知県","岐阜県","福井県","石川県","富山県","長野県","新潟県",
+    "滋賀県","京都府","奈良県","三重県","和歌山県","大阪府","兵庫県",
+    "鳥取県","岡山県","島根県","広島県","山口県","香川県","徳島県","高知県","愛媛県",
+    "福岡県","大分県","宮崎県","鹿児島県","熊本県","佐賀県","長崎県","沖縄県"
+  ];
+
+  let text = "";
+  Object.keys(grouped)
+    .sort((a, b) => compareScale(b, a))
+    .forEach(scale => {
+      text += `◁震度${scale}▷\n`;
+      prefOrder.forEach(pref => {
+        if (grouped[scale][pref]) {
+          const cities = grouped[scale][pref].sort().join("、");
+          text += `［${pref}］\n${cities}\n`;
+        }
+      });
+    });
+  return text.trim();
+}
+
+// ---------------------
+// 震度速報等を判定してテキスト作成
+// ---------------------
+function buildEarthquakeText(latest) {
+  const eq = latest.earthquake;
+  const h = eq.hypocenter || {};
+  const place = h.name || '(発生地点不明)';
+  const maxScale = scaleToText(eq.maxScale);
+  const magnitude = (h.magnitude != null && h.magnitude >= 0) ? h.magnitude.toFixed(1) : '不明';
+  const depth = depthToText(h.depth);
+  const tsunamiText = buildTsunamiText(eq.domesticTsunami, eq.foreignTsunami);
+  const intensityInfo = (latest.points && latest.points.length > 0) ? buildAreaText(latest.points) : '◁震度情報不明▷';
+  const time = new Date(eq.time).toLocaleString('ja-JP');
+
+  switch(latest.issue?.type) {
+    case "ScalePrompt":
+      return `《震度速報》
 ${time}
-震源地: ${place}
-最大震度: ${maxScale}
-マグニチュード: ${magnitude}
-深さ: ${depth}
+最大震度 ${maxScale}
+${tsunamiText}
+
+◆各地の震度(速報値)◆
+${intensityInfo}`;
+    case "Destination":
+      return `《震源速報》
+${time}
+震源地 ${place}
+マグニチュード ${magnitude}
+深さ ${depth}
+${tsunamiText}`;
+    case "DetailScale":
+      return `《地震情報》
+${time}
+震源地 ${place}
+最大震度 ${maxScale}
+マグニチュード ${magnitude}
+深さ ${depth}
 ${tsunamiText}
 
 ◆各地の震度◆
 ${intensityInfo}`;
-    }).join("\n\n--------------------\n\n");
+    case "Foreign":
+      return `《遠地地震情報》
+${time}
+震源地 ${place}
+最大震度 ${maxScale}
+マグニチュード ${magnitude}
+深さ ${depth}
+${tsunamiText}
 
-    container.textContent = formatted;
+◆各地の震度◆
+${intensityInfo}`;
+    default:
+      return `《地震情報》
+${time}
+震源地 ${place}
+最大震度 ${maxScale}
+マグニチュード ${magnitude}
+深さ ${depth}
+${tsunamiText}
 
-  } catch(err) {
-    container.textContent = "データ取得エラー: " + err.message;
+◆各地の震度◆
+${intensityInfo}`;
   }
 }
 
-// --------------------
-// 補助関数
-// --------------------
-function depthToText(depth){ if(depth==null||depth<0)return"不明"; if(depth===0)return"ごく浅い"; return depth+"km";}
-function scaleToText(scale){ const map={10:'1',20:'2',30:'3',40:'4',45:'5-',50:'5+',55:'6-',60:'6+',70:'7'}; return map[scale]||'不明';}
-function buildTsunamiText(domestic, foreign){ const d=domestic||"Unknown"; const f=foreign||""; if(d==="Warning"||d==="Watch") return "津波に関する情報を発表しています。"; if(d==="NonEffective") return "津波予報(若干の海面変動)を発表していますが、被害の心配はありません。"; if(d==="None"){ if(f==="Warning"||f==="Watch") return "この地震による国内での津波の心配はありません。"; return "この地震による津波の心配はありません。";} if(d==="Checking") return "この地震による津波の有無を現在調査中です。"; if(d==="Unknown") return "この地震による津波の有無は不明です。"; return "#Tsunami:Error!";}
-function compareScale(a,b){ const order={'1':10,'2':20,'3':30,'4':40,'5-':45,'5+':50,'6-':55,'6+':60,'7':70}; return (order[a]||0)-(order[b]||0);}
-function buildAreaText(points){ if(!points||points.length===0)return "◁震度情報不明▷"; const cityMaxScale={}; points.forEach(p=>{ const scale=scaleToText(p.scale); const cityMatch=p.addr.match(/(.+?[市区町村])/); const city=cityMatch?cityMatch[1]:p.addr; const key=`${p.pref}:${city}`; if(!cityMaxScale[key]||compareScale(scale,cityMaxScale[key])>0) cityMaxScale[key]=scale;}); const grouped={}; Object.keys(cityMaxScale).forEach(k=>{ const [pref,city]=k.split(':'); const scale=cityMaxScale[k]; if(!grouped[scale])grouped[scale]={}; if(!grouped[scale][pref])grouped[scale][pref]=[]; grouped[scale][pref].push(city);}); const prefOrder=["北海道","青森県","秋田県","岩手県","宮城県","山形県","福島県","茨城県","栃木県","群馬県","埼玉県","東京都","千葉県","神奈川県","山梨県","静岡県","愛知県","岐阜県","福井県","石川県","富山県","長野県","新潟県","滋賀県","京都府","奈良県","三重県","和歌山県","大阪府","兵庫県","鳥取県","岡山県","島根県","広島県","山口県","香川県","徳島県","高知県","愛媛県","福岡県","大分県","宮崎県","鹿児島県","熊本県","佐賀県","長崎県","沖縄県"]; let text=""; Object.keys(grouped).sort((a,b)=>compareScale(b,a)).forEach(scale=>{ text+=`◁震度${scale}▷\n`; prefOrder.forEach(pref=>{ if(grouped[scale][pref]){ const cities=grouped[scale][pref].sort().join("、"); text+=`［${pref}］\n${cities}\n`; } }); }); return text.trim();}
+// ---------------------
+// ページに表示
+// ---------------------
+async function loadEarthquakes() {
+  const container = document.getElementById('earthquake-container');
+  container.innerHTML = '読み込み中…';
+  try {
+    const res = await fetch('https://api.p2pquake.net/v2/history?codes=551&limit=5');
+    const data = await res.json();
+    container.innerHTML = '';
+    data.forEach(item => {
+      const text = buildEarthquakeText(item);
+      const box = document.createElement('div');
+      box.className = 'data-box';
+      box.innerHTML = `<button class="copy-btn">コピー</button><pre>${text}</pre>`;
+      container.appendChild(box);
 
-fetchEarthquakes();
+      box.querySelector('.copy-btn').addEventListener('click', () => {
+        navigator.clipboard.writeText(text).then(()=>alert('コピーしました'));
+      });
+    });
+  } catch (e) {
+    container.innerHTML = '地震情報の取得に失敗しました';
+    console.error(e);
+  }
+}
+
+loadEarthquakes();
 </script>
 
 </body>
