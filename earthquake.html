@@ -52,45 +52,45 @@
     margin-bottom: 20px;
   }
 
-  /* 地震情報ボタンのスタイル */
-  .earthquake-button {
-    background-color: #f0f0f0;
-    color: #333;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    padding: 15px;
-    margin: 10px auto;
-    width: 90%;
-    max-width: 700px;
-    text-align: left;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    display: block; /* 常に横幅いっぱいにする */
-  }
-  .earthquake-button:hover {
-    background-color: #e0e0e0;
-  }
-
-  /* 全文ボックスのスタイル */
+  /* 元のdata-boxのスタイル */
   .data-box {
-    margin: -10px auto 20px auto; /* ボタンとの間隔を調整 */
+    margin: 0 auto 20px auto; /* ボタンとの結合を考慮して上マージンを減らしました */
     width: 90%;
     max-width: 700px;
-    background: #f9f9f9;
-    border-radius: 0 0 10px 10px; /* 下部のみ角丸 */
-    border: 1px solid #ccc;
-    border-top: none; /* 上部の線を削除 */
+    background: #f0f0f0; /* 元の色を維持 */
+    border-radius: 0 0 10px 10px; /* ボタンと結合するため上部の角丸を削除 */
     padding: 20px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     white-space: pre-wrap;
     text-align: left;
     position: relative;
-    display: none; /* 初期状態では非表示 */
+    border-top: 1px solid #ccc; /* ボタンとの間に区切り線を追加 */
   }
-  .data-box.active {
-    display: block; /* activeクラスが付いたら表示 */
+
+  /* 修正点 1: 全文表示ボックスを非表示にするクラス */
+  .data-box.hidden {
+    display: none;
+  }
+
+  /* 修正点 2: ボタンのスタイル追加 (data-boxに合わせたデザイン) */
+  .earthquake-toggle-button {
+    display: block;
+    width: 90%;
+    max-width: 700px;
+    margin: 20px auto 0 auto;
+    padding: 15px 20px;
+    background-color: #f0f0f0; /* data-boxと同じ色 */
+    color: #333;
+    border: none;
+    border-radius: 10px 10px 0 0; /* 上部のみ角丸 */
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    text-align: left;
+  }
+  .earthquake-toggle-button:hover {
+    background-color: #e0e0e0; /* ホバー色も白に近いトーンで維持 */
   }
 
   .copy-btn {
@@ -103,7 +103,6 @@
     padding: 5px 10px;
     border-radius: 5px;
     cursor: pointer;
-    z-index: 10;
   }
 
   .copy-btn:hover {
@@ -160,36 +159,6 @@ function compareScale(a, b) {
   return (order[a]||0) - (order[b]||0);
 }
 
-// ---------------------
-// ボタンに表示するテキストを生成する関数 (新規作成)
-// ---------------------
-function buildButtonText(item) {
-  const eq = item.earthquake;
-  const time = new Date(eq.time).toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'});
-  const maxScale = scaleToText(eq.maxScale);
-  const place = eq.hypocenter?.name || '不明';
-
-  // 最大震度を観測した地点（都道府県名＋震度）を特定する
-  let maxScalePref = '';
-  if (item.points && item.points.length > 0) {
-    let highestScale = 0;
-    let highestPref = '';
-    item.points.forEach(p => {
-      if (p.scale > highestScale) {
-        highestScale = p.scale;
-        highestPref = p.pref;
-      }
-    });
-    maxScalePref = highestPref.replace(/県|府|都|道$/, '') + ' '; // 県などを除去してスペースを挿入
-  }
-  
-  // フォーマット: [時刻] 最大震度地点 震度X (震源: Y)
-  return `[${time}] ${maxScalePref}震度${maxScale} (震源: ${place})`;
-}
-
-// ---------------------
-// 震度速報等を判定してテキスト作成 (変更なし)
-// ---------------------
 function buildAreaText(points) {
   if (!points || points.length === 0) return "◁震度情報不明▷";
 
@@ -237,8 +206,11 @@ function buildAreaText(points) {
   return text.trim();
 }
 
-
+// ---------------------
+// 震度速報等を判定してテキスト作成 (元の構造を維持)
+// ---------------------
 function buildEarthquakeText(latest) {
+  // ... (この関数の内容は元のまま、ここでは省略)
   const eq = latest.earthquake;
   const h = eq.hypocenter || {};
   const place = h.name || '(発生地点不明)';
@@ -301,6 +273,35 @@ ${intensityInfo}`;
   }
 }
 
+/**
+ * ボタンに表示するテキストを生成する関数 (「東京 震度1」のような形式)
+ */
+function createButtonText(item) {
+  const eq = item.earthquake;
+  const time = new Date(eq.time).toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'});
+  const maxScale = scaleToText(eq.maxScale);
+  const place = eq.hypocenter?.name || '震源地不明';
+
+  // 最大震度を観測した地点を取得
+  let maxScalePref = '各地';
+  if (item.points && item.points.length > 0) {
+    // 震度情報から最大震度の地点を探す
+    const maxPoint = item.points.reduce((max, p) => (p.scale > max.scale ? p : max), {scale: 0});
+    if (maxPoint.scale > 0) {
+      // 観測地点（市区町村名）の取得を試みる
+      const cityMatch = maxPoint.addr.match(/(.+?[市区町村])/);
+      maxScalePref = cityMatch ? cityMatch[1] : maxPoint.pref;
+      // 都道府県名から「都/道/府/県」を削除
+      if (!cityMatch) {
+        maxScalePref = maxScalePref.replace(/都|道|府|県$/, '');
+      }
+    }
+  }
+
+  // 例: 21:30 東京 震度1
+  return `${time} / ${maxScalePref} 震度${maxScale}`;
+}
+
 
 // ---------------------
 // ページに表示 (ボタン表示・トグル機能を追加)
@@ -312,27 +313,26 @@ async function loadEarthquakes() {
     const res = await fetch('https://api.p2pquake.net/v2/history?codes=551&limit=5');
     const data = await res.json();
     container.innerHTML = '';
+    
     data.forEach(item => {
-      const text = buildEarthquakeText(item); // 全文
-      const buttonText = buildButtonText(item); // ボタン表示用の要約テキスト
+      const text = buildEarthquakeText(item);
       
-      // 1. ボタン要素を作成
+      // 1. トグルボタンを作成
       const button = document.createElement('button');
-      button.className = 'earthquake-button';
-      button.textContent = buttonText; // 要約テキストをボタンに表示
-      
-      // 2. 全文表示ボックスを作成
-      const box = document.createElement('div');
-      box.className = 'data-box'; // 初期状態はCSSで非表示
-      box.innerHTML = `<button class="copy-btn">コピー</button><pre>${text}</pre>`;
-      
+      button.className = 'earthquake-toggle-button';
+      button.textContent = createButtonText(item);
       container.appendChild(button);
+      
+      // 2. 全文表示ボックスを作成し、初期状態で非表示にする
+      const box = document.createElement('div');
+      box.className = 'data-box hidden'; // 'hidden'クラスを付けて初期非表示
+      box.innerHTML = `<button class="copy-btn">コピー</button><pre>${text}</pre>`;
       container.appendChild(box);
 
       // 3. ボタンにクリックイベントリスナーを追加（表示・非表示の切り替え）
       button.addEventListener('click', () => {
-        // data-box要素の'active'クラスをトグルする（表示/非表示の切り替え）
-        box.classList.toggle('active');
+        // 'hidden'クラスをトグルする
+        box.classList.toggle('hidden');
       });
 
       // 4. コピーボタンのイベントリスナー（変更なし）
